@@ -13,10 +13,6 @@ typedef struct
     float z;
 } vector3_t;
 
-typedef struct {
-    float x, y, z, w; // quaternion elements
-} quaternion_t;
-
 typedef enum {
     EULER_ORDER_XYZ,
     EULER_ORDER_XZY,
@@ -48,12 +44,12 @@ float vector3_distance(const vector3_t a, const vector3_t b);
 float vector3_dot(const vector3_t *v1, const vector3_t *v2);
 float vector3_get_angle(vector3_t *euler_v1, vector3_t *euler_v2);
 vector3_t vector3_sub(const vector3_t a, const vector3_t b);
-vector3_t vector3_apply_euler(vector3_t v, const euler_t e);
-vector3_t vector3_apply_quaternion( vector3_t v, const quaternion_t q );
+// vector3_t vector3_apply_euler(vector3_t v, const euler_t e);
+// vector3_t vector3_apply_quaternion( vector3_t v, const Quaternion q );
 vector3_t vector3_multiply_scalar(vector3_t v, float s);
 vector3_t vector3_add(vector3_t a, vector3_t b);
 
-quaternion_t quaternion_set_from_euler( quaternion_t q, const euler_t euler);
+// Quaternion quaternion_set_from_euler( Quaternion q, const euler_t euler);
 
 void vector2_array_new(vector2_array_t *v2, vector2_t *buf, size_t size);
 void vector2_array_zero(vector2_array_t *v2);

@@ -43,48 +43,48 @@ float vector3_distance(const vector3_t a, const vector3_t b)
 /// @param v A 3D vector.
 /// @param q The quaternion to rotate the vector by.
 /// @return Rotated vector v'.
-vector3_t vector3_apply_quaternion(vector3_t v, const quaternion_t q)
-{
+// vector3_t vector3_apply_quaternion(vector3_t v, const Quaternion q)
+// {
 
-	const float x = v.x, y = v.y, z = v.z;
-	const float qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+// 	const float x = v.x, y = v.y, z = v.z;
+// 	const float qx = q.x, qy = q.y, qz = q.z, qw = q.w;
 
-	// calculate quat * vector
+// 	// calculate quat * vector
 
-	const float ix = qw * x + qy * z - qz * y;
-	const float iy = qw * y + qz * x - qx * z;
-	const float iz = qw * z + qx * y - qy * x;
-	const float iw = -qx * x - qy * y - qz * z;
+// 	const float ix = qw * x + qy * z - qz * y;
+// 	const float iy = qw * y + qz * x - qx * z;
+// 	const float iz = qw * z + qx * y - qy * x;
+// 	const float iw = -qx * x - qy * y - qz * z;
 
-	// calculate result * inverse quat
+// 	// calculate result * inverse quat
 
-	v.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
-	v.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
-	v.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+// 	v.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+// 	v.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+// 	v.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
 
-	return v;
-}
+// 	return v;
+// }
 
-vector3_t vector3_apply_euler(vector3_t v, euler_t e)
-{
-	quaternion_t q = quaternion_set_from_euler((quaternion_t){0}, e);
-	v = vector3_apply_quaternion(v, q);
-	return v;
+// vector3_t vector3_apply_euler(vector3_t v, euler_t e)
+// {
+// 	Quaternion q = quaternion_set_from_euler((Quaternion){0}, e);
+// 	v = vector3_apply_quaternion(v, q);
+// 	return v;
 
-	// float x = v.x, y = v.y, z = v.z;
-	// float a = e.v.x, b = e.v.y, c = e.v.z;
-	// float cosA = cosf(a), sinA = sinf(a);
-	// float cosB = cosf(b), sinB = sinf(b);
-	// float cosC = cosf(c), sinC = sinf(c);
-	// float cosAcosB = cosA * cosB;
-	// float sinAsinB = sinA * sinB;
+// 	// float x = v.x, y = v.y, z = v.z;
+// 	// float a = e.v.x, b = e.v.y, c = e.v.z;
+// 	// float cosA = cosf(a), sinA = sinf(a);
+// 	// float cosB = cosf(b), sinB = sinf(b);
+// 	// float cosC = cosf(c), sinC = sinf(c);
+// 	// float cosAcosB = cosA * cosB;
+// 	// float sinAsinB = sinA * sinB;
 
-	// v.x = cosC * cosAcosB * x - sinC * sinA * y + cosA * sinB * z;
-	// v.y = sinC * cosAcosB * x + cosC * sinA * y + sinB * sinC * z;
-	// v.z = -sinA * cosB * x + sinB * y + cosA * cosB * z;
+// 	// v.x = cosC * cosAcosB * x - sinC * sinA * y + cosA * sinB * z;
+// 	// v.y = sinC * cosAcosB * x + cosC * sinA * y + sinB * sinC * z;
+// 	// v.z = -sinA * cosB * x + sinB * y + cosA * cosB * z;
 
-	// return v;
-}
+// 	// return v;
+// }
 
 vector3_t vector3_multiply_scalar(vector3_t v, float s)
 {
@@ -100,79 +100,79 @@ vector3_t vector3_add(vector3_t a, vector3_t b)
 	return result;
 }
 
-quaternion_t quaternion_set_from_euler(quaternion_t q, euler_t euler)
-{
+// Quaternion quaternion_set_from_euler(Quaternion q, euler_t euler)
+// {
 
-	const float x = euler.x, y = euler.y, z = euler.z;
-	const euler_order_t order = euler.order;
+// 	const float x = euler.x, y = euler.y, z = euler.z;
+// 	const euler_order_t order = euler.order;
 
-	// http://www.mathworks.com/matlabcentral/fileexchange/
-	// 	20696-function-to-convert-between-dcm-euler-angles-quaternions-and-euler-vectors/
-	//	content/SpinCalc.m
+// 	// http://www.mathworks.com/matlabcentral/fileexchange/
+// 	// 	20696-function-to-convert-between-dcm-euler-angles-quaternions-and-euler-vectors/
+// 	//	content/SpinCalc.m
 
-	// const cos = Math.cos;
-	// const sin = Math.sin;
+// 	// const cos = Math.cos;
+// 	// const sin = Math.sin;
 
-	const float c1 = cosf(x * 0.5);
-	const float c2 = cosf(y * 0.5);
-	const float c3 = cosf(z * 0.5);
+// 	const float c1 = cosf(x * 0.5);
+// 	const float c2 = cosf(y * 0.5);
+// 	const float c3 = cosf(z * 0.5);
 
-	const float s1 = sinf(x * 0.5);
-	const float s2 = sinf(y * 0.5);
-	const float s3 = sinf(z * 0.5);
+// 	const float s1 = sinf(x * 0.5);
+// 	const float s2 = sinf(y * 0.5);
+// 	const float s3 = sinf(z * 0.5);
 
-	switch (order)
-	{
+// 	switch (order)
+// 	{
 
-	case EULER_ORDER_XYZ: // 'XYZ'
-		q.x = s1 * c2 * c3 + c1 * s2 * s3;
-		q.y = c1 * s2 * c3 - s1 * c2 * s3;
-		q.z = c1 * c2 * s3 + s1 * s2 * c3;
-		q.w = c1 * c2 * c3 - s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_XYZ: // 'XYZ'
+// 		q.x = s1 * c2 * c3 + c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 - s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 + s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 - s1 * s2 * s3;
+// 		break;
 
-	case EULER_ORDER_YXZ: //'YXZ'
-		q.x = s1 * c2 * c3 + c1 * s2 * s3;
-		q.y = c1 * s2 * c3 - s1 * c2 * s3;
-		q.z = c1 * c2 * s3 - s1 * s2 * c3;
-		q.w = c1 * c2 * c3 + s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_YXZ: //'YXZ'
+// 		q.x = s1 * c2 * c3 + c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 - s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 - s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 + s1 * s2 * s3;
+// 		break;
 
-	case EULER_ORDER_ZXY: //'ZXY'
-		q.x = s1 * c2 * c3 - c1 * s2 * s3;
-		q.y = c1 * s2 * c3 + s1 * c2 * s3;
-		q.z = c1 * c2 * s3 + s1 * s2 * c3;
-		q.w = c1 * c2 * c3 - s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_ZXY: //'ZXY'
+// 		q.x = s1 * c2 * c3 - c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 + s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 + s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 - s1 * s2 * s3;
+// 		break;
 
-	case EULER_ORDER_ZYX: //'ZYX'
-		q.x = s1 * c2 * c3 - c1 * s2 * s3;
-		q.y = c1 * s2 * c3 + s1 * c2 * s3;
-		q.z = c1 * c2 * s3 - s1 * s2 * c3;
-		q.w = c1 * c2 * c3 + s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_ZYX: //'ZYX'
+// 		q.x = s1 * c2 * c3 - c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 + s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 - s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 + s1 * s2 * s3;
+// 		break;
 
-	case EULER_ORDER_YZX: //'YZX'
-		q.x = s1 * c2 * c3 + c1 * s2 * s3;
-		q.y = c1 * s2 * c3 + s1 * c2 * s3;
-		q.z = c1 * c2 * s3 - s1 * s2 * c3;
-		q.w = c1 * c2 * c3 - s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_YZX: //'YZX'
+// 		q.x = s1 * c2 * c3 + c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 + s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 - s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 - s1 * s2 * s3;
+// 		break;
 
-	case EULER_ORDER_XZY: //'XZY'
-		q.x = s1 * c2 * c3 - c1 * s2 * s3;
-		q.y = c1 * s2 * c3 - s1 * c2 * s3;
-		q.z = c1 * c2 * s3 + s1 * s2 * c3;
-		q.w = c1 * c2 * c3 + s1 * s2 * s3;
-		break;
+// 	case EULER_ORDER_XZY: //'XZY'
+// 		q.x = s1 * c2 * c3 - c1 * s2 * s3;
+// 		q.y = c1 * s2 * c3 - s1 * c2 * s3;
+// 		q.z = c1 * c2 * s3 + s1 * s2 * c3;
+// 		q.w = c1 * c2 * c3 + s1 * s2 * s3;
+// 		break;
 
-	default:
-		printf("quaternion_set_from_euler encountered an unknown order: %d", order);
-		break;
-	}
+// 	default:
+// 		printf("quaternion_set_from_euler encountered an unknown order: %d", order);
+// 		break;
+// 	}
 
-	return q;
-}
+// 	return q;
+// }
 
 // Function to convert Euler angles to a direction vector
 vector3_t euler_to_direction_vector(vector3_t *euler_angles) {
