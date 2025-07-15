@@ -57,6 +57,13 @@ public:
         return w * q.w + x * q.x + y * q.y + z * q.z;
     }
 
+    T angleBetween(const Quaternion<float>& q) const {
+        T dotProduct = dot(q);
+        // Clamp the dot product to the range [-1, 1] to avoid NaN from acos
+        dotProduct = std::fmax(-1.0f, std::fmin(1.0f, dotProduct));
+        return 2.0f * std::acos(dotProduct); // returns radians
+    }
+
     // Quaternion multiplication
     Quaternion operator*(const Quaternion &q) const
     {
