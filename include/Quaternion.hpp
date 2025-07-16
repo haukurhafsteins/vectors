@@ -100,6 +100,25 @@ public:
                  {2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy)}}};
     }
 
+    // Convert to axis-angle representation
+    Vector3<T> toAxisAngle() const
+    {
+        T angle = std::acos(w) * T(2); // Angle in radians
+        T s = std::sqrt(x * x + y * y + z * z);
+        if (s < T(1e-6))                                // Avoid division by zero
+            return Vector3<T>(1, 0, 0) * angle;         // Default axis if no rotation
+        return Vector3<T>(x / s, y / s, z / s) * angle; // Axis * angle
+    }
+
+    // Check if q is within margin radians of this quaternion
+    bool isWithin(const Quaternion &q, T marginRad) const
+    {
+        Quaternion qrel = this->inverse() * q;
+        Vector3<T> aa = qrel.toAxisAngle(); // Axis * angle (in radians)
+        T angle = aa.norm();                // Total rotation angle
+        return angle <= marginRad;
+    }
+
     static Quaternion fromAxisAngle(const Vector3<T> &axis, T angleRad)
     {
         T halfAngle = angleRad * T(0.5);
