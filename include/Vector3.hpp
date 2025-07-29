@@ -22,13 +22,13 @@ public:
     }
 
     // Vector length (magnitude)
-    T norm() const {
+    T magnitude() const {
         return std::sqrt(x * x + y * y + z * z);
     }
 
     // Normalize
     Vector3 normalized() const {
-        T n = norm();
+        T n = magnitude();
         if (n == T(0)) return Vector3(0, 0, 0);
         return *this / n;
     }

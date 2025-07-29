@@ -22,7 +22,7 @@ public:
     }
 
     // Norm (magnitude)
-    T norm() const
+    T magnitude() const
     {
         return std::sqrt(w * w + x * x + y * y + z * z);
     }
@@ -30,10 +30,24 @@ public:
     // Normalize
     Quaternion normalized() const
     {
-        T n = norm();
+        T n = magnitude();
         if (n == T(0))
             return Quaternion(1, 0, 0, 0);
         return Quaternion(w / n, x / n, y / n, z / n);
+    }
+
+    Quaternion& normalize()
+    {
+        T n = magnitude();
+        if (n == T(0))
+        {
+            w = 1; x = 0; y = 0; z = 0;
+        }
+        else
+        {
+            w /= n; x /= n; y /= n; z /= n;
+        }
+        return *this;
     }
 
     // Conjugate
@@ -57,11 +71,15 @@ public:
         return w * q.w + x * q.x + y * q.y + z * q.z;
     }
 
-    T angleBetween(const Quaternion<float>& q) const {
+    T angleBetween(const Quaternion<T>& q) const {
         T dotProduct = dot(q);
         // Clamp the dot product to the range [-1, 1] to avoid NaN from acos
         dotProduct = std::fmax(-1.0f, std::fmin(1.0f, dotProduct));
         return 2.0f * std::acos(dotProduct); // returns radians
+    }
+
+    T angleBetweenDeg(const Quaternion<T>& q) const {
+        return angleBetween(q) * (180.0f / M_PI); // Convert radians to degrees
     }
 
     // Quaternion multiplication
@@ -115,10 +133,114 @@ public:
     {
         Quaternion qrel = this->inverse() * q;
         Vector3<T> aa = qrel.toAxisAngle(); // Axis * angle (in radians)
-        T angle = aa.norm();                // Total rotation angle
+        T angle = aa.magnitude();           // Total rotation angle
         return angle <= marginRad;
     }
 
+    // Convert quaternion and gravity vector into yaw, pitch, roll (in degrees)
+    Vector3<T> yawPitchRoll(const Vector3<T> &g) const{
+        float pitch = std::atan2(-g.x, std::sqrt(g.y * g.y + g.z * g.z)) * (180.0f / M_PI);
+        float roll  = std::atan2(g.y, g.z) * (180.0f / M_PI);
+
+        // Extract yaw from quaternion
+        float siny_cosp = 2.0f * (w * z + x * y);
+        float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
+        float yaw = std::atan2(siny_cosp, cosy_cosp) * (180.0f / M_PI);
+
+        return { yaw, pitch, roll };
+    }
+
+        // Estimate a reference vector in the ground plane (perpendicular to gravity) using the reference quaternion
+    Vector3<T> referenceInPlane(const Vector3<T> &gravity) 
+    {
+        // Define forward vector in local space
+        Vector3<T> forward_local = {1.0f, 0.0f, 0.0f};
+
+        // Rotate forward vector by reference quaternion
+        Quaternion<T> f = {forward_local.x, forward_local.y, forward_local.z, 0.0f};
+        Quaternion<T> q_conj = {-x, -y, -z, w};
+
+        Quaternion<T> tmp = {
+            w * f.x + y * f.z - z * f.y,
+            w * f.y + z * f.x - x * f.z,
+            w * f.z + x * f.y - y * f.x,
+            -x * f.x - y * f.y - z * f.z
+        };
+
+        Quaternion<T> rotated = {
+            tmp.w * q_conj.x + tmp.x * q_conj.w + tmp.y * q_conj.z - tmp.z * q_conj.y,
+            tmp.w * q_conj.y + tmp.y * q_conj.w + tmp.z * q_conj.x - tmp.x * q_conj.z,
+            tmp.w * q_conj.z + tmp.z * q_conj.w + tmp.x * q_conj.y - tmp.y * q_conj.x,
+            tmp.w * q_conj.w - tmp.x * q_conj.x - tmp.y * q_conj.y - tmp.z * q_conj.z
+        };
+
+        // Subtract gravity component to project into plane
+        float g_mag = std::sqrt(gravity.x * gravity.x + gravity.y * gravity.y + gravity.z * gravity.z);
+        if (g_mag < TOLERANCE) return {0.0f, 0.0f, 0.0f};
+        Vector3<T> g_unit = { gravity.x / g_mag, gravity.y / g_mag, gravity.z / g_mag };
+
+        float dot = rotated.x * g_unit.x + rotated.y * g_unit.y + rotated.z * g_unit.z;
+        Vector3<T> proj = {
+            rotated.x - dot * g_unit.x,
+            rotated.y - dot * g_unit.y,
+            rotated.z - dot * g_unit.z
+        };
+
+        float proj_mag = std::sqrt(proj.x * proj.x + proj.y * proj.y + proj.z * proj.z);
+        if (proj_mag < TOLERANCE) return {0.0f, 0.0f, 0.0f};
+
+        return {proj.x / proj_mag, proj.y / proj_mag, proj.z / proj_mag};
+    }
+
+    Quaternion<T> relative(const Quaternion<T> &q2) {
+        Quaternion<T> q1_inv = { -x, -y, -z, w }; // Conjugate (assuming unit quaternion)
+        Quaternion<T> q_rel;
+        q_rel.w = q1_inv.w*q2.w - q1_inv.x*q2.x - q1_inv.y*q2.y - q1_inv.z*q2.z;
+        q_rel.x = q1_inv.w*q2.x + q1_inv.x*q2.w + q1_inv.y*q2.z - q1_inv.z*q2.y;
+        q_rel.y = q1_inv.w*q2.y - q1_inv.x*q2.z + q1_inv.y*q2.w + q1_inv.z*q2.x;
+        q_rel.z = q1_inv.w*q2.z + q1_inv.x*q2.y - q1_inv.y*q2.x + q1_inv.z*q2.w;
+        q_rel.normalize();
+        return q_rel;
+    }
+    float signedProjectedRotationDeg(const Quaternion<T> &q2, const Vector3<T> &gravity, const Vector3<T> &reference_in_plane) {
+        Quaternion<T> q_rel = relative(q2);
+        float angle_rad = 2.0f * std::atan2(
+            std::sqrt(q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z),
+            q_rel.w);
+
+        float norm = q_rel.magnitude();
+        if (norm < TOLERANCE) return 0.0f;
+
+        Vector3<T> rot_axis = { q_rel.x / norm, q_rel.y / norm, q_rel.z / norm };
+
+        // Normalize gravity vector
+        float g_mag = std::sqrt(gravity.x * gravity.x + gravity.y * gravity.y + gravity.z * gravity.z);
+        if (g_mag < TOLERANCE) return 0.0f;
+
+        Vector3<T> g_unit = { gravity.x / g_mag, gravity.y / g_mag, gravity.z / g_mag };
+
+        // Project rotation axis onto plane perpendicular to gravity
+        float dot_g = rot_axis.x * g_unit.x + rot_axis.y * g_unit.y + rot_axis.z * g_unit.z;
+        Vector3<T> proj = {
+            rot_axis.x - dot_g * g_unit.x,
+            rot_axis.y - dot_g * g_unit.y,
+            rot_axis.z - dot_g * g_unit.z
+        };
+
+        float proj_mag = std::sqrt(proj.x * proj.x + proj.y * proj.y + proj.z * proj.z);
+        if (proj_mag < TOLERANCE) return 0.0f;
+
+        // Normalize projected vector
+        proj.x /= proj_mag;
+        proj.y /= proj_mag;
+        proj.z /= proj_mag;
+
+        // Compute signed angle using cross product with reference in plane
+        Vector3<T> ref = reference_in_plane; // Assumed to be normalized and in the ground plane
+        float sign = (ref.x * proj.y - ref.y * proj.x + ref.z * proj.z) > 0.0f ? 1.0f : -1.0f;
+
+        return sign * angle_rad * proj_mag * (180.0f / M_PI);
+    }
     static Quaternion fromAxisAngle(const Vector3<T> &axis, T angleRad)
     {
         T halfAngle = angleRad * T(0.5);
@@ -131,4 +253,6 @@ public:
     {
         return Quaternion(T(1), T(0), T(0), T(0));
     }
+
+    static constexpr float TOLERANCE = 1e-2f;
 };
