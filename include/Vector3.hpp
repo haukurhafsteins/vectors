@@ -89,6 +89,29 @@ public:
         return {x, y, z};
     }
 
+    enum class GravityMotionDirection : uint8_t
+    {
+        Perpendicular,
+        With,
+        Against
+    };
+
+    /// @brief Determine the direction of motion relative to gravity
+    /// @param gravity The gravity vector
+    /// @return The direction of motion relative to gravity
+    GravityMotionDirection directionRelativeToGravity(const Vector3<T>& gravity) const
+    {
+        Vector3<T> gravity_normalized = gravity.normalized();
+        T dot_product = this->dot(gravity_normalized);
+
+        const T epsilon = static_cast<T>(1e-4);
+        if (dot_product > epsilon)
+            return GravityMotionDirection::With;
+        else if (dot_product < -epsilon)
+            return GravityMotionDirection::Against;
+        return GravityMotionDirection::Perpendicular;
+    }
+
     // Zero vector
     static Vector3 zero() {
         return Vector3(0, 0, 0);
