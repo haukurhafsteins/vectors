@@ -99,12 +99,11 @@ public:
     /// @brief Determine the direction of motion relative to gravity
     /// @param gravity The gravity vector
     /// @return The direction of motion relative to gravity
-    GravityMotionDirection directionRelativeToGravity(const Vector3<T>& gravity) const
+    GravityMotionDirection directionRelativeToGravity(const Vector3<T>& gravity, const T epsilon = static_cast<T>(1e-2)) const
     {
         Vector3<T> gravity_normalized = gravity.normalized();
         T dot_product = this->dot(gravity_normalized);
 
-        const T epsilon = static_cast<T>(1e-4);
         if (dot_product > epsilon)
             return GravityMotionDirection::With;
         else if (dot_product < -epsilon)
