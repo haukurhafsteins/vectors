@@ -211,6 +211,35 @@ public:
         q_rel.normalize();
         return q_rel;
     }
+
+    enum class GravityMotionDirection : int8_t
+    {
+        Against = -1,
+        Perpendicular = 0,
+        With = 1,
+    };
+    GravityMotionDirection directionRelativeToGravity(const Vector3<T> &gravity_world, const T epsilon = T(1e-4))
+    {
+        // Forward in local frame
+        Vector3<T> forward_local = {1.0f, 0.0f, 0.0f};
+
+        // Rotate to world frame
+        Vector3<T> forward_world = this->rotate(forward_local);
+
+        float dot = forward_world.normalized().dot(gravity_world.normalized());
+
+        // The dot product indicates the alignment of the forward direction with gravity:
+        // - If dot > epsilon: "With" means forward is aligned with gravity.
+        // - If dot < -epsilon: "Against" means forward is opposite to gravity.
+        // - Otherwise: "Perpendicular" means forward is orthogonal to gravity.
+        if (dot > epsilon)
+            return GravityMotionDirection::With;
+        else if (dot < -epsilon)
+            return GravityMotionDirection::Against;
+        else
+            return GravityMotionDirection::Perpendicular;
+    }
+
     float signedProjectedRotationDeg(const Quaternion<T> &q2, const Vector3<T> &gravity, const Vector3<T> &reference_in_plane)
     {
         Quaternion<T> q_rel = relative(q2);

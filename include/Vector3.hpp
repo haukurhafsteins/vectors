@@ -89,11 +89,11 @@ public:
         return {x, y, z};
     }
 
-    enum class GravityMotionDirection : uint8_t
+    enum class GravityMotionDirection : int8_t
     {
-        Perpendicular,
-        With,
-        Against
+        Against = -1,
+        Perpendicular = 0,
+        With = 1,
     };
 
     /// @brief Determine the direction of motion relative to gravity
