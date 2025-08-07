@@ -111,6 +111,17 @@ public:
         return GravityMotionDirection::Perpendicular;
     }
 
+    Vector3<T> accumulateYawPitchRoll(const Vector3<T>& previous, const Vector3<T>& gravity) const
+    {
+        // Calculate the yaw, pitch, and roll angles based on the current vector and gravity
+        T yaw = std::atan2(x, z);
+        T pitch = std::atan2(y, std::sqrt(x * x + z * z));
+        T roll = std::atan2(z, x);
+
+        // Accumulate angles
+        return Vector3<T>(previous.x + yaw, previous.y + pitch, previous.z + roll);
+    }
+
     // Zero vector
     static Vector3 zero() {
         return Vector3(0, 0, 0);
