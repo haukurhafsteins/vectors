@@ -350,28 +350,79 @@ public:
 template<typename T>
 class QuaternionRotationAccumulator {
 public:
-    Quaternion<T> q_start;
+    // Optional: choose the axis you want to accumulate around (unit vector).
+    // If you don't care about sign, leave it zero and we accumulate magnitude only.
+    Vector3<T> ref_axis;   // must be normalized if used
+    bool use_signed = false;
 
-    QuaternionRotationAccumulator() : q_start(Quaternion<T>::identity()) {}
+    // State
+    Quaternion<T> q_prev;
+    bool has_prev = false;
+    T total_angle = T(0);
 
-    // Constructor: set the starting orientation
-    QuaternionRotationAccumulator(const Quaternion<T>& start)
-        : q_start(start.normalized()) {}
+    // Tuning
+    T eps = T(1e-6);      // small threshold to ignore jitter
 
-    // Call regularly to get total rotation from start
-    Vector3<T> getEulerFromStart(const Quaternion<T>& q_current) const {
-        Quaternion<T> q_delta = q_start.inverse() * q_current;
-        return q_delta.toEuler();  // Returns yaw, pitch, roll delta from start
+    QuaternionRotationAccumulator() = default;
+
+    void reset(const Quaternion<T>& q0, Vector3<T> axis = {}, bool signed_angle = false) {
+        q_prev = normalizeSafe(q0);
+        has_prev = true;
+        total_angle = T(0);
+        ref_axis = axis;
+        if (signed_angle && axis.magnitude() > T(0)) {
+            ref_axis = axis / axis.magnitude();
+            use_signed = true;
+        } else {
+            use_signed = false;
+        }
     }
 
-    Vector3<T> getAxisAngleFromStart(const Quaternion<T>& q_current) const {
-        Quaternion<T> q_delta = q_start.inverse() * q_current;
-        return q_delta.toAxisAngle();  // axis * angle in radians
+    // Call this on each new sample; returns the cumulative angle (radians).
+    T update(const Quaternion<T>& q_in) {
+        Quaternion<T> q_curr = normalizeSafe(q_in);
+
+        if (!has_prev) {
+            q_prev = q_curr;
+            has_prev = true;
+            return total_angle;
+        }
+
+        // Enforce continuity (avoid q ↔ -q flips)
+        if (q_prev.dot(q_curr) < T(0)) {
+            q_curr = Quaternion<T>(-q_curr.x, -q_curr.y, -q_curr.z, -q_curr.w);
+        }
+
+        // Incremental delta from previous to current
+        Quaternion<T> q_delta = q_prev.inverse() * q_curr;
+        q_delta = normalizeSafe(q_delta);
+
+        // Convert to axis * angle
+        Vector3<T> axis_times_angle = q_delta.toAxisAngle();  // axis * angle
+        T angle = axis_times_angle.magnitude();
+
+        // Filter tiny noise
+        if (angle > eps) {
+            if (use_signed) {
+                // Sign by projection of the axis onto ref_axis
+                Vector3<T> axis = axis_times_angle / angle; // unit axis
+                T s = (axis.dot(ref_axis) >= T(0)) ? T(1) : T(-1);
+                total_angle += s * angle;
+            } else {
+                total_angle += angle;
+            }
+        }
+
+        q_prev = q_curr;
+        return total_angle;
     }
 
-    T getTotalRotationAngle(const Quaternion<T>& q_current) const {
-        Quaternion<T> q_delta = q_start.inverse() * q_current;
-        Vector3<T> axisAngle = q_delta.toAxisAngle();
-        return axisAngle.magnitude();  // returns total angle in radians
+    T value() const { return total_angle; }
+
+private:
+    static Quaternion<T> normalizeSafe(const Quaternion<T>& q) {
+        T n = q.magnitude();
+        if (n == T(0)) return Quaternion<T>(0,0,0,1);
+        return Quaternion<T>(q.x/n, q.y/n, q.z/n, q.w/n);
     }
 };
