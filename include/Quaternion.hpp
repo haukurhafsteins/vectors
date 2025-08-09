@@ -107,8 +107,7 @@ public:
             w * q.x + x * q.w + y * q.z - z * q.y,
             w * q.y - x * q.z + y * q.w + z * q.x,
             w * q.z + x * q.y - y * q.x + z * q.w,
-            w * q.w - x * q.x - y * q.y - z * q.z
-        );
+            w * q.w - x * q.x - y * q.y - z * q.z);
     }
 
     // Scalar multiplication
@@ -142,9 +141,9 @@ public:
     {
         T angle = std::acos(w) * T(2); // Angle in radians
         T s = std::sqrt(x * x + y * y + z * z);
-        if (s < T(1e-6))                                // Avoid division by zero
+        if (s < T(1e-6))                                 // Avoid division by zero
             return Vector3<T>(T(1), T(0), T(0)) * angle; // Default axis if no rotation
-        return Vector3<T>(x / s, y / s, z / s) * angle; // Axis * angle
+        return Vector3<T>(x / s, y / s, z / s) * angle;  // Axis * angle
     }
 
     // Check if q is within margin radians of this quaternion
@@ -166,6 +165,24 @@ public:
         T siny_cosp = T(2.0) * (w * z + x * y);
         T cosy_cosp = T(1.0) - T(2.0) * (y * y + z * z);
         T yaw = std::atan2(siny_cosp, cosy_cosp) * (T(180.0) / T(M_PI));
+
+        return {yaw, pitch, roll};
+    }
+
+    Vector3<T> toEuler() const
+    {
+        T sinr_cosp = T(2.0) * (w * x + y * z);
+        T cosr_cosp = T(1.0) - T(2.0) * (x * x + y * y);
+        T roll = std::atan2(sinr_cosp, cosr_cosp);
+
+        T sinp = T(2.0) * (w * y - z * x);
+        if (std::abs(sinp) >= T(1.0))
+            return {T(0), std::copysign(T(M_PI / 2), sinp), T(0)}; // Use 90 degrees if out of range
+        T pitch = std::asin(sinp);
+
+        T siny_cosp = T(2.0) * (w * z + x * y);
+        T cosy_cosp = T(1.0) - T(2.0) * (y * y + z * z);
+        T yaw = std::atan2(siny_cosp, cosy_cosp);
 
         return {yaw, pitch, roll};
     }
@@ -245,8 +262,8 @@ public:
     {
         Quaternion<T> q_rel = relative(q2);
         T angle_rad = T(2.0) * std::atan2(
-                                     std::sqrt(q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z),
-                                     q_rel.w);
+                                   std::sqrt(q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z),
+                                   q_rel.w);
 
         T norm = q_rel.magnitude();
         if (norm < tolerance)
@@ -283,8 +300,7 @@ public:
         Vector3<T> cross = {
             ref.y * proj.z - ref.z * proj.y,
             ref.z * proj.x - ref.x * proj.z,
-            ref.x * proj.y - ref.y * proj.x
-        };
+            ref.x * proj.y - ref.y * proj.x};
         // Dot product with plane normal (gravity direction)
         T sign = (cross.x * g_unit.x + cross.y * g_unit.y + cross.z * g_unit.z) >= T(0) ? T(1) : T(-1);
 
@@ -303,28 +319,59 @@ public:
         return Quaternion(T(0), T(0), T(0), T(1));
     }
 
-    static T accumulateContinuousRotation(T &accumulated, T previous, T current, T deadzone = T(0.001))
+    static T accumulateContinuousRotation(T &accumulated, T previous, T current, T maxAngle = T(180), T deadzone = T(0.001))
     {
         T delta = current - previous;
-        while (delta > T(180.0))
-            delta -= T(360.0);
-        while (delta < T(-180.0))
-            delta += T(360.0);
+
+        T wrapRange = maxAngle * 2;
+
+        while (delta > maxAngle)
+            delta -= wrapRange;
+        while (delta < -maxAngle)
+            delta += wrapRange;
 
         if (std::abs(delta) > deadzone)
             accumulated += delta;
 
         return accumulated;
     }
-    
+
     /**
      * @brief Tolerance value for floating-point comparisons in quaternion operations.
-     * 
+     *
      * This value is used to avoid errors due to floating-point precision issues,
      * such as division by zero or comparing near-zero magnitudes.
-     * 
+     *
      * Recommended value: T(1e-4) (can be adjusted as needed for your application).
      */
     static constexpr T DEFAULT_TOLERANCE = T(1e-4);
 };
 
+template<typename T>
+class QuaternionRotationAccumulator {
+public:
+    Quaternion<T> q_start;
+
+    QuaternionRotationAccumulator() : q_start(Quaternion<T>::identity()) {}
+
+    // Constructor: set the starting orientation
+    QuaternionRotationAccumulator(const Quaternion<T>& start)
+        : q_start(start.normalized()) {}
+
+    // Call regularly to get total rotation from start
+    Vector3<T> getEulerFromStart(const Quaternion<T>& q_current) const {
+        Quaternion<T> q_delta = q_start.inverse() * q_current;
+        return q_delta.toEuler();  // Returns yaw, pitch, roll delta from start
+    }
+
+    Vector3<T> getAxisAngleFromStart(const Quaternion<T>& q_current) const {
+        Quaternion<T> q_delta = q_start.inverse() * q_current;
+        return q_delta.toAxisAngle();  // axis * angle in radians
+    }
+
+    T getTotalRotationAngle(const Quaternion<T>& q_current) const {
+        Quaternion<T> q_delta = q_start.inverse() * q_current;
+        Vector3<T> axisAngle = q_delta.toAxisAngle();
+        return axisAngle.magnitude();  // returns total angle in radians
+    }
+};
