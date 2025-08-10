@@ -139,11 +139,12 @@ public:
     // Convert to axis-angle representation
     Vector3<T> toAxisAngle() const
     {
-        T angle = std::acos(w) * T(2); // Angle in radians
-        T s = std::sqrt(x * x + y * y + z * z);
-        if (s < T(1e-6))                                 // Avoid division by zero
-            return Vector3<T>(T(1), T(0), T(0)) * angle; // Default axis if no rotation
-        return Vector3<T>(x / s, y / s, z / s) * angle;  // Axis * angle
+        T v = std::sqrt(x * x + y * y + z * z);
+        T wc = (w < T(-1)) ? T(-1) : (w > T(1) ? T(1) : w);
+        T angle = T(2) * std::atan2(v, wc);
+        if (v < T(1e-12))
+            return Vector3<T>(T(1), T(0), T(0)) * angle;
+        return Vector3<T>(x / v, y / v, z / v) * angle;
     }
 
     // Check if q is within margin radians of this quaternion
@@ -347,82 +348,147 @@ public:
     static constexpr T DEFAULT_TOLERANCE = T(1e-4);
 };
 
-template<typename T>
-class QuaternionRotationAccumulator {
+// Add this improved accumulator next to your Quaternion class.
+// Assumes: Quaternion<T> has .dot(), .inverse(), .magnitude(), and .toAxisAngle() that returns axis*angle (Vector3<T>).
+
+template <typename T>
+class QuaternionRotationAccumulator
+{
 public:
-    // Optional: choose the axis you want to accumulate around (unit vector).
-    // If you don't care about sign, leave it zero and we accumulate magnitude only.
-    Vector3<T> ref_axis;   // must be normalized if used
-    bool use_signed = false;
-
-    // State
-    Quaternion<T> q_prev;
-    bool has_prev = false;
-    T total_angle = T(0);
-
-    // Tuning
-    T eps = T(1e-6);      // small threshold to ignore jitter
+    // --- Configuration ---
+    // If you want a signed scalar total, provide a ref axis and set signed_angle=true in reset().
+    // Per-axis accumulation uses a basis (e1,e2,e3). Defaults to world XYZ.
+    struct Basis
+    {
+        Vector3<T> e1{T(1), T(0), T(0)};
+        Vector3<T> e2{T(0), T(1), T(0)};
+        Vector3<T> e3{T(0), T(0), T(1)};
+    };
 
     QuaternionRotationAccumulator() = default;
 
-    void reset(const Quaternion<T>& q0, Vector3<T> axis = {}, bool signed_angle = false) {
-        q_prev = normalizeSafe(q0);
-        has_prev = true;
-        total_angle = T(0);
-        ref_axis = axis;
-        if (signed_angle && axis.magnitude() > T(0)) {
-            ref_axis = axis / axis.magnitude();
-            use_signed = true;
-        } else {
-            use_signed = false;
+    void setBasis(const Vector3<T> &x, const Vector3<T> &y, const Vector3<T> &z)
+    {
+        basis_.e1 = normOrDefault(x, Vector3<T>(T(1), T(0), T(0)));
+        basis_.e2 = normOrDefault(y, Vector3<T>(T(0), T(1), T(0)));
+        basis_.e3 = normOrDefault(z, Vector3<T>(T(0), T(0), T(1)));
+    }
+
+    void setEpsilon(T eps) { eps_ = eps; }
+
+    // Initialize accumulator. If signed_angle=true and axis!=0, scalar total is signed about that axis.
+    void reset(const Quaternion<T> &q0,
+               Vector3<T> signed_ref_axis = {},
+               bool signed_angle = false)
+    {
+        q_prev_ = normalizeSafe(q0);
+        has_prev_ = true;
+        total_scalar_ = T(0);
+        total_axis_ = Vector3<T>(T(0), T(0), T(0));
+
+        if (signed_angle && signed_ref_axis.magnitude() > T(0))
+        {
+            ref_axis_ = signed_ref_axis / signed_ref_axis.magnitude();
+            use_signed_ = true;
+        }
+        else
+        {
+            ref_axis_ = Vector3<T>(T(0), T(0), T(0));
+            use_signed_ = false;
         }
     }
 
-    // Call this on each new sample; returns the cumulative angle (radians).
-    T update(const Quaternion<T>& q_in) {
+    // Feed each new sample; returns the scalar cumulative angle (radians).
+    T update(const Quaternion<T> &q_in)
+    {
         Quaternion<T> q_curr = normalizeSafe(q_in);
 
-        if (!has_prev) {
-            q_prev = q_curr;
-            has_prev = true;
-            return total_angle;
+        if (!has_prev_)
+        {
+            q_prev_ = q_curr;
+            has_prev_ = true;
+            return total_scalar_;
         }
 
-        // Enforce continuity (avoid q ↔ -q flips)
-        if (q_prev.dot(q_curr) < T(0)) {
+        // Enforce quaternion continuity (q ~ -q)
+        if (q_prev_.dot(q_curr) < T(0))
+        {
             q_curr = Quaternion<T>(-q_curr.x, -q_curr.y, -q_curr.z, -q_curr.w);
         }
 
         // Incremental delta from previous to current
-        Quaternion<T> q_delta = q_prev.inverse() * q_curr;
-        q_delta = normalizeSafe(q_delta);
+        Quaternion<T> q_delta = normalizeSafe(q_prev_.inverse() * q_curr);
 
-        // Convert to axis * angle
-        Vector3<T> axis_times_angle = q_delta.toAxisAngle();  // axis * angle
-        T angle = axis_times_angle.magnitude();
+        // axis_times_angle = u * theta  (Vector3)
+        Vector3<T> rvec = q_delta.toAxisAngle();
+        T angle = rvec.magnitude();
 
-        // Filter tiny noise
-        if (angle > eps) {
-            if (use_signed) {
-                // Sign by projection of the axis onto ref_axis
-                Vector3<T> axis = axis_times_angle / angle; // unit axis
-                T s = (axis.dot(ref_axis) >= T(0)) ? T(1) : T(-1);
-                total_angle += s * angle;
-            } else {
-                total_angle += angle;
+        if (angle > eps_)
+        {
+            // ---- Scalar total ----
+            if (use_signed_)
+            {
+                // Sign by projection of instantaneous axis onto ref_axis_
+                Vector3<T> axis = rvec / angle; // unit
+                T s = (axis.dot(ref_axis_) >= T(0)) ? T(1) : T(-1);
+                total_scalar_ += s * angle;
             }
+            else
+            {
+                total_scalar_ += angle;
+            }
+
+            // ---- Per-axis totals (project rvec on basis) ----
+            // Note: Summing rotation vectors is exact for infinitesimal steps and
+            // a very good approximation at typical IMU rates.
+            total_axis_.x += rvec.dot(basis_.e1);
+            total_axis_.y += rvec.dot(basis_.e2);
+            total_axis_.z += rvec.dot(basis_.e3);
         }
 
-        q_prev = q_curr;
-        return total_angle;
+        q_prev_ = q_curr;
+        return total_scalar_;
     }
 
-    T value() const { return total_angle; }
+    // ---- Readouts ----
+    T valueScalar() const { return total_scalar_; }         // radians
+    Vector3<T> valuePerAxis() const { return total_axis_; } // radians about basis e1/e2/e3
+    T valueAlong(const Vector3<T> &axis) const
+    { // radians about custom axis
+        Vector3<T> a = normOrDefault(axis, {});
+        if (a.magnitude() == T(0))
+            return T(0);
+        return total_axis_.dot(a);
+    }
 
 private:
-    static Quaternion<T> normalizeSafe(const Quaternion<T>& q) {
+    // --- State ---
+    Quaternion<T> q_prev_{T(0), T(0), T(0), T(1)};
+    bool has_prev_ = false;
+
+    // Scalar accumulation
+    bool use_signed_ = false;
+    Vector3<T> ref_axis_{T(0), T(0), T(0)};
+    T total_scalar_ = T(0);
+
+    // Per-axis accumulation
+    Basis basis_;
+    Vector3<T> total_axis_{T(0), T(0), T(0)}; // components are radians
+
+    // Tuning
+    T eps_ = T(1e-6);
+
+    // --- Helpers ---
+    static Quaternion<T> normalizeSafe(const Quaternion<T> &q)
+    {
         T n = q.magnitude();
-        if (n == T(0)) return Quaternion<T>(0,0,0,1);
-        return Quaternion<T>(q.x/n, q.y/n, q.z/n, q.w/n);
+        if (n == T(0))
+            return Quaternion<T>(T(0), T(0), T(0), T(1));
+        return Quaternion<T>(q.x / n, q.y / n, q.z / n, q.w / n);
+    }
+    static Vector3<T> normOrDefault(const Vector3<T> &v, const Vector3<T> &def)
+    {
+        T m = v.magnitude();
+        return (m > T(0)) ? (v / m) : def;
     }
 };
