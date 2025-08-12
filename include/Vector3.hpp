@@ -89,28 +89,6 @@ public:
         return {x, y, z};
     }
 
-    enum class GravityMotionDirection : int8_t
-    {
-        Against = -1,
-        Perpendicular = 0,
-        With = 1,
-    };
-
-    /// @brief Determine the direction of motion relative to gravity
-    /// @param gravity The gravity vector
-    /// @return The direction of motion relative to gravity
-    GravityMotionDirection directionRelativeToGravity(const Vector3<T>& gravity, const T epsilon = static_cast<T>(1e-2)) const
-    {
-        Vector3<T> gravity_normalized = gravity.normalized();
-        T dot_product = this->dot(gravity_normalized);
-
-        if (dot_product > epsilon)
-            return GravityMotionDirection::With;
-        else if (dot_product < -epsilon)
-            return GravityMotionDirection::Against;
-        return GravityMotionDirection::Perpendicular;
-    }
-
     Vector3<T> accumulateYawPitchRoll(const Vector3<T>& previous, const Vector3<T>& gravity) const
     {
         // Calculate the yaw, pitch, and roll angles based on the current vector and gravity
