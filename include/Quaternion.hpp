@@ -307,6 +307,20 @@ public:
 
         return sign * angle_rad * proj_mag * (T(180.0) / T(M_PI));
     }
+
+    static Quaternion<T> normalizeSafe(const Quaternion<T> &q)
+    {
+        T n = q.magnitude();
+        if (n == T(0))
+            return Quaternion<T>(T(0), T(0), T(0), T(1));
+        return Quaternion<T>(q.x / n, q.y / n, q.z / n, q.w / n);
+    }
+    static Vector3<T> normOrDefault(const Vector3<T> &v, const Vector3<T> &def)
+    {
+        T m = v.magnitude();
+        return (m > T(0)) ? (v / m) : def;
+    }
+
     static Quaternion fromAxisAngle(const Vector3<T> &axis, T angleRad)
     {
         T halfAngle = angleRad * T(0.5);
@@ -369,9 +383,9 @@ public:
 
     void setBasis(const Vector3<T> &x, const Vector3<T> &y, const Vector3<T> &z)
     {
-        basis_.e1 = normOrDefault(x, Vector3<T>(T(1), T(0), T(0)));
-        basis_.e2 = normOrDefault(y, Vector3<T>(T(0), T(1), T(0)));
-        basis_.e3 = normOrDefault(z, Vector3<T>(T(0), T(0), T(1)));
+        basis_.e1 = Quaternion<T>::normOrDefault(x, Vector3<T>(T(1), T(0), T(0)));
+        basis_.e2 = Quaternion<T>::normOrDefault(y, Vector3<T>(T(0), T(1), T(0)));
+        basis_.e3 = Quaternion<T>::normOrDefault(z, Vector3<T>(T(0), T(0), T(1)));
     }
 
     void setEpsilon(T eps) { eps_ = eps; }
@@ -381,7 +395,7 @@ public:
                Vector3<T> signed_ref_axis = {},
                bool signed_angle = false)
     {
-        q_prev_ = normalizeSafe(q0);
+        q_prev_ = Quaternion<T>::normalizeSafe(q0);
         has_prev_ = true;
         total_scalar_ = T(0);
         total_axis_ = Vector3<T>(T(0), T(0), T(0));
@@ -401,7 +415,7 @@ public:
     // Feed each new sample; returns the scalar cumulative angle (radians).
     T update(const Quaternion<T> &q_in)
     {
-        Quaternion<T> q_curr = normalizeSafe(q_in);
+        Quaternion<T> q_curr = Quaternion<T>::normalizeSafe(q_in);
 
         if (!has_prev_)
         {
@@ -417,7 +431,7 @@ public:
         }
 
         // Incremental delta from previous to current
-        Quaternion<T> q_delta = normalizeSafe(q_prev_.inverse() * q_curr);
+        Quaternion<T> q_delta = Quaternion<T>::normalizeSafe(q_prev_.inverse() * q_curr);
 
         // axis_times_angle = u * theta  (Vector3)
         Vector3<T> rvec = q_delta.toAxisAngle();
@@ -477,18 +491,4 @@ private:
 
     // Tuning
     T eps_ = T(1e-6);
-
-    // --- Helpers ---
-    static Quaternion<T> normalizeSafe(const Quaternion<T> &q)
-    {
-        T n = q.magnitude();
-        if (n == T(0))
-            return Quaternion<T>(T(0), T(0), T(0), T(1));
-        return Quaternion<T>(q.x / n, q.y / n, q.z / n, q.w / n);
-    }
-    static Vector3<T> normOrDefault(const Vector3<T> &v, const Vector3<T> &def)
-    {
-        T m = v.magnitude();
-        return (m > T(0)) ? (v / m) : def;
-    }
-};
+ };
