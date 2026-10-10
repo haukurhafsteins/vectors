@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <array>
+#include <numbers>
 #include "Vector3.hpp"
 
 template <typename T>
@@ -97,7 +98,7 @@ public:
 
     T angleBetweenDeg(const Quaternion<T> &q) const
     {
-        return angleBetween(q) * (T(180.0) / T(M_PI)); // Convert radians to degrees
+        return angleBetween(q) * (T(180.0) / T(std::numbers::pi_v<double>)); // Convert radians to degrees
     }
 
     // Quaternion multiplication
@@ -159,13 +160,13 @@ public:
     // Convert quaternion and gravity vector into yaw, pitch, roll (in degrees)
     Vector3<T> yawPitchRoll(const Vector3<T> &g) const
     {
-        T pitch = std::atan2(-g.x, std::sqrt(g.y * g.y + g.z * g.z)) * (T(180.0) / T(M_PI));
-        T roll = std::atan2(g.y, g.z) * (T(180.0) / T(M_PI));
+        T pitch = std::atan2(-g.x, std::sqrt(g.y * g.y + g.z * g.z)) * (T(180.0) / T(std::numbers::pi_v<double>));
+        T roll = std::atan2(g.y, g.z) * (T(180.0) / T(std::numbers::pi_v<double>));
 
         // Extract yaw from quaternion
         T siny_cosp = T(2.0) * (w * z + x * y);
         T cosy_cosp = T(1.0) - T(2.0) * (y * y + z * z);
-        T yaw = std::atan2(siny_cosp, cosy_cosp) * (T(180.0) / T(M_PI));
+        T yaw = std::atan2(siny_cosp, cosy_cosp) * (T(180.0) / T(std::numbers::pi_v<double>));
 
         return {yaw, pitch, roll};
     }
@@ -178,7 +179,7 @@ public:
 
         T sinp = T(2.0) * (w * y - z * x);
         if (std::abs(sinp) >= T(1.0))
-            return {T(0), std::copysign(T(M_PI / 2), sinp), T(0)}; // Use 90 degrees if out of range
+            return {T(0), std::copysign(T(std::numbers::pi_v<double> / 2.0), sinp), T(0)}; // Use 90 degrees if out of range
         T pitch = std::asin(sinp);
 
         T siny_cosp = T(2.0) * (w * z + x * y);
@@ -305,7 +306,7 @@ public:
         // Dot product with plane normal (gravity direction)
         T sign = (cross.x * g_unit.x + cross.y * g_unit.y + cross.z * g_unit.z) >= T(0) ? T(1) : T(-1);
 
-        return sign * angle_rad * proj_mag * (T(180.0) / T(M_PI));
+        return sign * angle_rad * proj_mag * (T(180.0) / T(std::numbers::pi_v<double>));
     }
 
     static Quaternion<T> normalizeSafe(const Quaternion<T> &q)
